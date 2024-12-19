@@ -196,6 +196,8 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
+	std::cout << "Welcome to our SHA3 Tool!" << '\n';
+
 	std::vector<uint8_t> data;
 	if (!readFile(argv[1], data)) {
 		std::cerr << "Error: Failed to open file: " << argv[1] << "\n";
