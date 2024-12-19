@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -std=c++11 -Wall -Iinclude
 
-SRCS = src/main.cpp src/SHA3.cpp
+SRCS = src/main.cpp
 OBJS = $(SRCS:.cpp=.o)
 EXEC = sha3_hash
 
