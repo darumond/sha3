@@ -152,8 +152,14 @@ private:
 
 	// Rotate left operation for 64-bit integers
 	inline uint64_t ROTL64(uint64_t x, int shift) {
-		return (x << shift) | (x >> (64 - shift));
+		uint64_t result = x;
+		for (int i = 0; i < shift; i++) {
+			uint64_t msb = (result >> 63) & 1;
+			result = (result << 1) | msb;      // Shift left and set least significant bit
+		}
+		return result;
 	}
+
 
 	// π step constants
 	static const int KeccakPi[24];
