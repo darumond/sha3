@@ -190,90 +190,32 @@ bool readFile(const std::string& filePath, std::vector<uint8_t>& data) {
 	return true;
 }
 
-// Main function
-int main() {
-	int hashBitLength = 0;
-	int choice = 0;
-	std::string input;
-
-	// Choose SHA-3 variant
-	std::cout << "Select SHA-3 variant:\n";
-	std::cout << "1. SHA3-224\n";
-	std::cout << "2. SHA3-256\n";
-	std::cout << "3. SHA3-384\n";
-	std::cout << "4. SHA3-512\n";
-	std::cout << "Enter choice (1-4): ";
-	std::cin >> choice;
-
-	switch (choice) {
-		case 1:
-			hashBitLength = 224;
-			break;
-		case 2:
-			hashBitLength = 256;
-			break;
-		case 3:
-			hashBitLength = 384;
-			break;
-		case 4:
-			hashBitLength = 512;
-			break;
-		default:
-			std::cout << "Invalid choice. Defaulting to SHA3-256.\n";
-			hashBitLength = 256;
-			break;
-	}
-
-	// Choose to hash a phrase or a file
-	std::cout << "\nDo you want to hash a phrase or a file?\n";
-	std::cout << "1. Phrase\n";
-	std::cout << "2. File\n";
-	std::cout << "Enter choice (1-2): ";
-	std::cin >> choice;
-	std::cin.ignore(); // Clear the newline character from the input buffer
-
-	std::vector<uint8_t> data;
-
-	if (choice == 1) {
-		// Hash a phrase
-		std::cout << "\nEnter the phrase to hash: ";
-		std::getline(std::cin, input);
-
-		// Convert input string to a vector of bytes
-		data.assign(input.begin(), input.end());
-	} else if (choice == 2) {
-		// Hash a file
-		std::cout << "\nEnter the file path: ";
-		std::getline(std::cin, input);
-
-		if (!readFile(input, data)) {
-			std::cerr << "Error: Failed to open or read the file.\n";
-			return 1;
-		}
-	} else {
-		std::cerr << "Invalid choice.\n";
+int main(int argc, char* argv[]) {
+	if (argc < 2) {
+		std::cerr << "Usage: " << argv[0] << " <file_path>\n";
 		return 1;
 	}
 
-	// Initialize SHA-3 with the chosen bit length
-	SHA3 sha3(hashBitLength);
-	uint8_t hash[64]; // Maximum hash size is 64 bytes (512 bits)
-
-	// Update the SHA-3 context with the data
-	sha3.absorb(data.data(), data.size());
-	// Finalize and get the hash
-	sha3.squeeze(hash);
-
-	// Get the actual hash length
-	size_t hashLength = sha3.getOutputLength();
-
-	// Print the hash in hexadecimal format
-	std::cout << "\nSHA3-" << hashBitLength << " Hash:\n";
-	for (size_t i = 0; i < hashLength; i++) {
-		printf("%02x", hash[i]);
+	std::vector<uint8_t> data;
+	if (!readFile(argv[1], data)) {
+		std::cerr << "Error: Failed to open file: " << argv[1] << "\n";
+		return 1;
 	}
-	std::cout << std::endl;
 
+	int hashBitLengths[4] = {224, 256, 384, 512};
+	uint8_t hash[64];
+
+	for (int i = 0; i < 4; i++) {
+		SHA3 sha3(hashBitLengths[i]);
+		sha3.absorb(data.data(), data.size());
+		sha3.squeeze(hash);
+
+		std::cout << "\nSHA3-" << hashBitLengths[i] << " Hash:\n";
+		for (size_t j = 0; j < sha3.getOutputLength(); j++) {
+			printf("%02x", hash[j]);
+		}
+		std::cout << std::endl;
+	}
 	return 0;
 }
 
