@@ -1,6 +1,7 @@
 #include "sha3.h"
 #include <cstring>
 
+// Constantes de l'etape ι
 static const uint64_t roundConstants[24] = {
 		0x0000000000000001ULL, 0x0000000000008082ULL,
 		0x800000000000808aULL, 0x8000000080008000ULL,
@@ -17,7 +18,7 @@ static const uint64_t roundConstants[24] = {
 };
 
 
-// π step constants
+// Constantes de l'etape π
 const int SHA3::KeccakPi[24] = {
 		10, 7, 11, 17, 18,
 		3, 5, 16, 8, 21,
@@ -26,7 +27,7 @@ const int SHA3::KeccakPi[24] = {
 		22, 9, 6, 1
 };
 
-// ρ step constants
+// Constantes de l'etape ρ
 const int SHA3::KeccakRhoOffsets[24] = {
 		1, 3, 6, 10, 15,
 		21, 28, 36, 45, 55,
@@ -45,6 +46,7 @@ inline uint64_t SHA3::ROTL64(uint64_t x, int shift) {
 }
 
 SHA3::SHA3(int hashBitLength) {
+	// Etape Initialization
 	memset(state, 0, sizeof(state));
 	memset(stateBytes, 0, sizeof(stateBytes));
 	position = 0;
@@ -73,6 +75,7 @@ SHA3::SHA3(int hashBitLength) {
 	}
 }
 
+// Etape absorb
 void SHA3::absorb(const uint8_t* input, size_t length) {
 	size_t currentPosition = position;
 	for (size_t i = 0; i < length; i++) {
@@ -84,7 +87,7 @@ void SHA3::absorb(const uint8_t* input, size_t length) {
 	}
 	position = currentPosition;
 }
-
+// Etape squeeze
 void SHA3::squeeze(uint8_t* digest) {
 	stateBytes[position] ^= 0x06;
 	stateBytes[rateSize - 1] ^= 0x80;
@@ -105,6 +108,8 @@ void SHA3::keccakF() {
 		}
 	}
 	for (int round = 0; round < 24; round++) {
+
+		// Etape θ
 		for (int i = 0; i < 5; i++) {
 			columnParity[i] = lanes[i] ^ lanes[i + 5] ^ lanes[i + 10] ^ lanes[i + 15] ^ lanes[i + 20];
 		}
@@ -114,6 +119,8 @@ void SHA3::keccakF() {
 				lanes[j + i] ^= temp;
 			}
 		}
+
+		// Etape ρ et π
 		temp = lanes[1];
 		for (int i = 0; i < 24; i++) {
 			int targetLane = KeccakPi[i];
@@ -121,6 +128,8 @@ void SHA3::keccakF() {
 			lanes[targetLane] = ROTL64(temp, KeccakRhoOffsets[i]);
 			temp = columnParity[0];
 		}
+
+		// Etape χ
 		for (int j = 0; j < 25; j += 5) {
 			uint64_t row[5];
 			for (int i = 0; i < 5; i++) {
@@ -130,8 +139,11 @@ void SHA3::keccakF() {
 				lanes[j + i] ^= (~row[(i + 1) % 5]) & row[(i + 2) % 5];
 			}
 		}
+
+		// Etape ι
 		lanes[0] ^= roundConstants[round];
 	}
+
 	for (int i = 0; i < 25; i++) {
 		for (int j = 0; j < 8; j++) {
 			stateBytes[i * 8 + j] = (lanes[i] >> (8 * j)) & 0xFF;
