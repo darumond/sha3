@@ -12,8 +12,6 @@ Example:
 
 Output Example:
 
-Welcome to our SHA3 Tool!
-
 SHA3-224 Hash:
 e642824c3f8cf24ad09234ee7d3c766fc9a3a5168d0c94ad73b46fdf
 
