@@ -6,81 +6,80 @@
 #include <vector>
 #include <csignal>
 
-
 class SHA3 {
 public:
 	// Constructor: Initializes the SHA3 context with the desired hash bit length
-	SHA3(int bitlen) {
-		memset(s, 0, sizeof(s));
-		memset(sb, 0, sizeof(sb)); // Initialize sb to zero
-		pt = 0;
+	SHA3(int hashBitLength) {
+		memset(state, 0, sizeof(state));
+		memset(stateBytes, 0, sizeof(stateBytes)); // Initialize stateBytes to zero
+		position = 0;
 
-		switch (bitlen) {
+		switch (hashBitLength) {
 			case 224:
-				rsiz = 144; // 200 - 2 * mdlen (mdlen = 28 bytes)
-				mdlen = 28;
+				rateSize = 144; // 200 - 2 * outputLength (outputLength = 28 bytes)
+				outputLength = 28;
 				break;
 			case 256:
-				rsiz = 136; // 200 - 2 * mdlen (mdlen = 32 bytes)
-				mdlen = 32;
+				rateSize = 136; // 200 - 2 * outputLength (outputLength = 32 bytes)
+				outputLength = 32;
 				break;
 			case 384:
-				rsiz = 104; // 200 - 2 * mdlen (mdlen = 48 bytes)
-				mdlen = 48;
+				rateSize = 104; // 200 - 2 * outputLength (outputLength = 48 bytes)
+				outputLength = 48;
 				break;
 			case 512:
-				rsiz = 72;  // 200 - 2 * mdlen (mdlen = 64 bytes)
-				mdlen = 64;
+				rateSize = 72;  // 200 - 2 * outputLength (outputLength = 64 bytes)
+				outputLength = 64;
 				break;
 			default:
 				// Default to SHA3-256
-				rsiz = 136;
-				mdlen = 32;
+				rateSize = 136;
+				outputLength = 32;
 				break;
 		}
 	}
 
 	// Updates the SHA3 context with new data
-	void update(const uint8_t* data, size_t len) {
+	void absorb(const uint8_t* input, size_t length) {
 		size_t i;
-		size_t j = pt;
+		size_t currentPosition = position;
 
-		for (i = 0; i < len; i++) {
-			sb[j++] ^= data[i];
-			if (j >= rsiz) {
+		for (i = 0; i < length; i++) {
+			stateBytes[currentPosition++] ^= input[i];
+			if (currentPosition >= rateSize) {
 				keccakF();
-				j = 0;
+				currentPosition = 0;
 			}
 		}
-		pt = j;
+		position = currentPosition;
 	}
 
 	// Finalizes the hash and outputs the digest
-	void finalize(uint8_t* hash) {
-		sb[pt] ^= 0x06;            // SHA-3 padding (0x06 is the SHA-3 domain separator)
-		sb[rsiz - 1] ^= 0x80;      // Final bit padding
+	void squeeze(uint8_t* digest) {
+		stateBytes[position] ^= 0x06;            // SHA-3 padding (0x06 is the SHA-3 domain separator)
+		stateBytes[rateSize - 1] ^= 0x80;      // Final bit padding
 
 		keccakF();                 // Perform the final permutation
 
-		// Copy the hash output from sb to the provided hash buffer
-		memcpy(hash, sb, mdlen);
+		// Copy the hash output from stateBytes to the provided digest buffer
+		memcpy(digest, stateBytes, outputLength);
 	}
 
 	// Returns the message digest length
-	size_t getHashLength() const {
-		return mdlen;
+	size_t getOutputLength() const {
+		return outputLength;
 	}
 
 private:
-	uint64_t s[25];    // State array as 64-bit words
-	uint8_t sb[200];   // State array as bytes
-	size_t pt;         // Position tracker
-	size_t rsiz;       // Rate size
-	size_t mdlen;      // Message digest length
+	uint64_t state[25];    // State array as 64-bit words
+	uint8_t stateBytes[200];   // State array as bytes
+	size_t position;         // Position tracker
+	size_t rateSize;       // Rate size
+	size_t outputLength;      // Message digest length
 
 	// Keccak-f[1600] permutation
 	void keccakF() {
-		static const uint64_t RC[24] = {
+		static const uint64_t roundConstants[24] = {
 				0x0000000000000001ULL, 0x0000000000008082ULL,
 				0x800000000000808aULL, 0x8000000080008000ULL,
 				0x000000000000808bULL, 0x0000000080000001ULL,
@@ -95,14 +94,14 @@ private:
 				0x0000000080000001ULL, 0x8000000080008008ULL
 		};
 
-		uint64_t st[25];
-		uint64_t t, bc[5];
+		uint64_t lanes[25];
+		uint64_t temp, columnParity[5];
 
 		// Convert state from bytes to 64-bit words (little-endian)
 		for (int i = 0; i < 25; i++) {
-			st[i] = 0;
+			lanes[i] = 0;
 			for (int j = 0; j < 8; j++) {
-				st[i] |= (uint64_t)sb[i * 8 + j] << (8 * j);
+				lanes[i] |= (uint64_t)stateBytes[i * 8 + j] << (8 * j);
 			}
 		}
 
@@ -110,60 +109,60 @@ private:
 		for (int round = 0; round < 24; round++) {
 			// θ step
 			for (int i = 0; i < 5; i++) {
-				bc[i] = st[i] ^ st[i + 5] ^ st[i + 10] ^ st[i + 15] ^ st[i + 20];
+				columnParity[i] = lanes[i] ^ lanes[i + 5] ^ lanes[i + 10] ^ lanes[i + 15] ^ lanes[i + 20];
 			}
 			for (int i = 0; i < 5; i++) {
-				t = ROTL64(bc[(i + 1) % 5], 1) ^ bc[(i + 4) % 5];
+				temp = ROTL64(columnParity[(i + 1) % 5], 1) ^ columnParity[(i + 4) % 5];
 				for (int j = 0; j < 25; j += 5) {
-					st[j + i] ^= t;
+					lanes[j + i] ^= temp;
 				}
 			}
 
 			// ρ and π steps
-			t = st[1];
+			temp = lanes[1];
 			for (int i = 0; i < 24; i++) {
-				int j = KeccakP1600PiLane[i];
-				bc[0] = st[j];
-				st[j] = ROTL64(t, KeccakP1600RhoOffsets[i]);
-				t = bc[0];
+				int targetLane = KeccakPi[i];
+				columnParity[0] = lanes[targetLane];
+				lanes[targetLane] = ROTL64(temp, KeccakRhoOffsets[i]);
+				temp = columnParity[0];
 			}
 
 			// χ step
 			for (int j = 0; j < 25; j += 5) {
-				uint64_t temp[5];
+				uint64_t row[5];
 				for (int i = 0; i < 5; i++) {
-					temp[i] = st[j + i];
+					row[i] = lanes[j + i];
 				}
 				for (int i = 0; i < 5; i++) {
-					st[j + i] ^= (~temp[(i + 1) % 5]) & temp[(i + 2) % 5];
+					lanes[j + i] ^= (~row[(i + 1) % 5]) & row[(i + 2) % 5];
 				}
 			}
 
 			// ι step
-			st[0] ^= RC[round];
+			lanes[0] ^= roundConstants[round];
 		}
 
 		// Convert state back to bytes (little-endian)
 		for (int i = 0; i < 25; i++) {
 			for (int j = 0; j < 8; j++) {
-				sb[i * 8 + j] = (st[i] >> (8 * j)) & 0xFF;
+				stateBytes[i * 8 + j] = (lanes[i] >> (8 * j)) & 0xFF;
 			}
 		}
 	}
 
 	// Rotate left operation for 64-bit integers
-	inline uint64_t ROTL64(uint64_t x, int y) {
-		return (x << y) | (x >> (64 - y));
+	inline uint64_t ROTL64(uint64_t x, int shift) {
+		return (x << shift) | (x >> (64 - shift));
 	}
 
 	// π step constants
-	static const int KeccakP1600PiLane[24];
+	static const int KeccakPi[24];
 	// ρ step constants
-	static const int KeccakP1600RhoOffsets[24];
+	static const int KeccakRhoOffsets[24];
 };
 
 // π step constants
-const int SHA3::KeccakP1600PiLane[24] = {
+const int SHA3::KeccakPi[24] = {
 		10, 7, 11, 17, 18,
 		3, 5, 16, 8, 21,
 		24, 4, 15, 23, 19,
@@ -172,7 +171,7 @@ const int SHA3::KeccakP1600PiLane[24] = {
 };
 
 // ρ step constants
-const int SHA3::KeccakP1600RhoOffsets[24] = {
+const int SHA3::KeccakRhoOffsets[24] = {
 		1, 3, 6, 10, 15,
 		21, 28, 36, 45, 55,
 		2, 14, 27, 41, 56,
@@ -189,7 +188,6 @@ bool readFile(const std::string& filePath, std::vector<uint8_t>& data) {
 
 	data.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
 	return true;
-
 }
 
 // Main function
@@ -262,12 +260,12 @@ int main() {
 	uint8_t hash[64]; // Maximum hash size is 64 bytes (512 bits)
 
 	// Update the SHA-3 context with the data
-	sha3.update(data.data(), data.size());
+	sha3.absorb(data.data(), data.size());
 	// Finalize and get the hash
-	sha3.finalize(hash);
+	sha3.squeeze(hash);
 
 	// Get the actual hash length
-	size_t hashLength = sha3.getHashLength();
+	size_t hashLength = sha3.getOutputLength();
 
 	// Print the hash in hexadecimal format
 	std::cout << "\nSHA3-" << hashBitLength << " Hash:\n";

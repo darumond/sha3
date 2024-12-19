@@ -1,14 +1,23 @@
+# Compiler
 CXX = g++
-CXXFLAGS = -std=c++11 -Wall -Iinclude
 
-SRCS = src/main.cpp
-OBJS = $(SRCS:.cpp=.o)
-EXEC = sha3_hash
+# Compiler flags
+CXXFLAGS = -std=c++17 -Wall -Wextra -O2
 
-all: $(EXEC)
+# Target executable name
+TARGET = sha3
 
-$(EXEC): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+# Source files
+SRC = src/main.cpp
 
+# Default target
+all: $(TARGET)
+
+# Build target
+$(TARGET): $(SRC)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SRC)
+
+# Clean target
 clean:
-	rm -f $(OBJS) $(EXEC)
+	rm -f $(TARGET)
+
