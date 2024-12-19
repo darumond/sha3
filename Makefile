@@ -12,5 +12,10 @@ all: $(TARGET)
 $(TARGET): $(SRC)
 	$(CXX) $(CXXFLAGS) $(INCLUDE) -o $(TARGET) $(SRC)
 
+test: $(TARGET)
+	@echo "Running tests..."
+	python3 tests/test_sha3.py
+
 clean:
 	rm -f $(TARGET)
+
